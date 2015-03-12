@@ -56,3 +56,7 @@ $train_tool --num-threads=1 --num-updates=1 --cross-validate=false --learn-rate=
 # $mlp_best \
 # > $log || exit 1;
 
+$train_tool --num-threads=1 --num-updates=1 --cross-validate=false --learn-rate=$learn_rate --bunchsize=$minibatch_size \
+            --cachesize=$randomizer_size --feature-transform=$feature_transform \
+            nnet.next $feats_tr $labels_tr nnet2.next\
+            > $log || exit 1;

@@ -14,7 +14,7 @@
 
 #include "gpuErrCheck_INLINE_H_.h"
 #include "lbx_cuda_kernels.h"
-#include "lbx_io.h"
+#include "cnn_io.h"
 #include "lbx_nn.h"
 #include "parse-options.h"
 #include "cnnFunc.h"
@@ -68,6 +68,8 @@ typedef struct {
 
     float *loss_all_merge_s;
     long long *correct_all_merge_s;
+
+    bool multicard;
 
 } lbx_pthread_arg;
 
@@ -198,9 +200,14 @@ int main(int argc, char const *argv[]) {
     int *nn_in_dim, *nn_out_dim;
     int nn_layer_num;
 
-    nn_layer_num = lbxReadKaldiNnet( model_filename.c_str(), 
-	    &nn_para_cpu,
-	    &nn_in_dim, &nn_out_dim );
+    float *cnn_cpu;
+    cnn_params params_cnn;
+    int cnn_hidden_node_num;
+
+
+    nn_layer_num = ReadKaldiCNNnet( model_filename.c_str(), 
+	    &nn_para_cpu, &cnn_cpu,
+	    &nn_in_dim, &nn_out_dim, &params_cnn );
 
     if( nn_layer_num <= 0 ) {
 	printf("Read Nnet File Error!\n");
@@ -215,54 +222,7 @@ int main(int argc, char const *argv[]) {
     }
     // std::cout<< "Hidden Neuron Num = " << nn_hidden_node_num << std::endl;
 
-    // Read CNN Parameters
-    ///******************************************************************* 
-    FILE* file_cnn_topo = fopen("cnn_para_top.dat","r");
-    FILE* file_cnn_para = fopen("cnn_para.dat","rb");
-
-    float *cnn_cpu;
-    int cnn_hidden_node_num= 0;
-    cnn_params params_cnn;
-    fscanf(file_cnn_topo, "%d", &params_cnn.layer_num);
-    fscanf(file_cnn_topo, "%d", &params_cnn.cnn_para_num);
-
-    int n=params_cnn.layer_num;
-
-    cnn_cpu = (float*)malloc(sizeof(float)*params_cnn.cnn_para_num);
-
-    params_cnn.patch_stride  = (int*)malloc(sizeof(int)*n);
-    params_cnn.patch_dim     = (int*)malloc(sizeof(int)*n);
-    params_cnn.patch_step    = (int*)malloc(sizeof(int)*n);
-    params_cnn.filter_section  = (int*)malloc(sizeof(int)*n); 
-    params_cnn.filter_step      = (int*)malloc(sizeof(int)*n); 
-    params_cnn.pool_size       = (int*)malloc(sizeof(int)*n); 
-    params_cnn.pool_step      = (int*)malloc(sizeof(int)*n);
-    params_cnn.pool_stride    = (int*)malloc(sizeof(int)*n);
-    params_cnn.cnn_in_dim    = (int*)malloc(sizeof(int)*n); 
-    params_cnn.cnn_out_dim  = (int*)malloc(sizeof(int)*n); 
-    params_cnn.pool_out_dim = (int*)malloc(sizeof(int)*n); 
-
-    for (int i=0; i<n; i++)
-    {
-	fscanf(file_cnn_topo, "%d",params_cnn.patch_stride +i);
-	fscanf(file_cnn_topo, "%d",params_cnn.patch_dim  +i);
-	fscanf(file_cnn_topo, "%d",params_cnn.patch_step +i);
-	fscanf(file_cnn_topo, "%d",params_cnn.filter_section+i);
-	fscanf(file_cnn_topo, "%d",params_cnn.filter_step +i);
-	fscanf(file_cnn_topo, "%d",params_cnn.pool_size +i);
-	fscanf(file_cnn_topo, "%d",params_cnn.pool_step +i);
-	fscanf(file_cnn_topo, "%d",params_cnn.pool_stride +i);
-	fscanf(file_cnn_topo, "%d",params_cnn.cnn_in_dim +i);
-	fscanf(file_cnn_topo, "%d",params_cnn.cnn_out_dim+i);
-	fscanf(file_cnn_topo, "%d",params_cnn.pool_out_dim+i);
-
-	cnn_hidden_node_num += params_cnn.cnn_out_dim[i];
-    }
-
-    fread(cnn_cpu, sizeof(float), params_cnn.cnn_para_num, file_cnn_para);
-
-    fclose(file_cnn_topo);
-    fclose(file_cnn_para);
+    cnn_hidden_node_num = params_cnn.cnn_out_dim[0];
 
     printf("CNN files read\n");
 
@@ -332,6 +292,7 @@ int main(int argc, char const *argv[]) {
 	thread_arg[thread_count].frames_all_merge_s = &frames_all_merge;
 	thread_arg[thread_count].loss_all_merge_s = &loss_all_merge;
 	thread_arg[thread_count].correct_all_merge_s = &correct_all_merge;
+	thread_arg[thread_count].multicard = (gpu_count > 1);
 
     }
 
@@ -373,20 +334,17 @@ int main(int argc, char const *argv[]) {
     printf( "-------------------------------------\n" );
     printf( "             Finish!\n" );
     printf( "-------------------------------------\n" );
-
     if ( !crossvalidate ) {
+
 
 	printf( "Save NN Parameter FILE: %s\n",target_model_filename.c_str() );
 
-	lbxSaveKaldiNnet( target_model_filename.c_str(),
+
+	SaveKaldiCNNnet( target_model_filename.c_str(),
 		nn_layer_num, nn_para_num, 
 		nn_para_cpu,
-		nn_in_dim, nn_out_dim );
-	// modified by MHZ
-	//*********************************************************
-	FILE* file_cnn_out = fopen("cnn_para_iter.dat","wb");
-	fwrite(cnn_cpu, sizeof(float), params_cnn.cnn_para_num, file_cnn_out);
-	fclose(file_cnn_out);
+		nn_in_dim, nn_out_dim,
+		cnn_cpu, &params_cnn);
 
 	//*********************************************************
 
@@ -421,8 +379,12 @@ void *lbxParallelTrainLock ( void *arg ) {
 
     time_t start_time, finish_time;
     long long total_time;
+    long long cnn_back_time,cnn_pro_time, dnn_back_time, dnn_pro_time;
+    time_t point_t,cnn_b_time_t, cnn_p_time_t, dnn_b_time_t, dnn_p_time_t;
 
     bool cv_flag = thread_arg_t->cv_flag_s;
+
+    bool multicard = thread_arg_t->multicard;
 
     float *nn_para_cpu = thread_arg_t->nn_para_cpu_s;
 
@@ -612,11 +574,6 @@ void *lbxParallelTrainLock ( void *arg ) {
 
     gpuErrCheck( cudaMalloc((void**)&nn_para_gpu, nn_para_num * sizeof(float)) );
 
-    gpuErrCheck( cudaMemcpy( nn_para_gpu,
-		nn_para_cpu,
-		nn_para_num * sizeof(float),
-		cudaMemcpyHostToDevice ) );
-
     gpuErrCheck( cudaMalloc((void**)&nn_para_gpu_BAK, nn_para_num * sizeof(float)) );
 
     gpuErrCheck( cudaMalloc((void**)&nn_in_gpu, nn_in_stride * (train_data_buffer_size + IO_READ_BUF_SIZE - 1) * sizeof(float)) );
@@ -636,13 +593,18 @@ void *lbxParallelTrainLock ( void *arg ) {
 
     gpuErrCheck( cudaMalloc((void**)&nn_delta_gpu, nn_hidden_node_num * batch_size * sizeof(float)) );
 
+    gpuErrCheck( cudaMemcpy( nn_para_gpu,
+		nn_para_cpu,
+		nn_para_num * sizeof(float),
+		cudaMemcpyHostToDevice ) );
+
     /// CNN Part
     //************************************************
     float *cnn_para_delta;
 
 
     float *cnn_para_gpu_BAK;
-    float *cnn_para_gpu;
+    float *cnn_para_gpu, *cnn_para_grad_gpu;
     float *cnn_delta_gpu;
     float *cnn_hidden_result_gpu;
 
@@ -661,16 +623,17 @@ void *lbxParallelTrainLock ( void *arg ) {
     gpuErrCheck( cudaMalloc((void**)&mid_delta_gpu, nn_in_dim[0] * batch_size*sizeof(float)));
     gpuErrCheck( cudaMalloc((void**)&cnn_hidden_result_gpu, cnn_hidden_node_num*batch_size*sizeof(float)));
     gpuErrCheck( cudaMalloc((void**)&cnn_para_gpu, params_cnn->cnn_para_num * sizeof(float)));
+    gpuErrCheck( cudaMalloc((void**)&cnn_para_grad_gpu, params_cnn->cnn_para_num * sizeof(float)));
     gpuErrCheck( cudaMalloc((void**)&cnn_para_gpu_BAK, params_cnn->cnn_para_num * sizeof(float)));
     gpuErrCheck( cudaMalloc((void**)&cnn_delta_gpu, cnn_hidden_node_num * batch_size*sizeof(float)));
     gpuErrCheck( cudaMalloc((void**)&mask, params_cnn->pool_out_dim[0]*batch_size*sizeof(int)));
     gpuErrCheck( cudaMalloc((void**)&transform_matrix, params_cnn->cnn_in_dim[0] * params_cnn->cnn_in_dim[0] * sizeof(float)));
 
-    gpuErrCheck( cudaMemset(mid_data_gpu, nn_in_dim[0] * batch_size*sizeof(float) , 0));
-    gpuErrCheck( cudaMemset( mid_delta_gpu, nn_in_dim[0] * batch_size*sizeof(float), 0));
-    gpuErrCheck( cudaMemset( cnn_hidden_result_gpu, cnn_hidden_node_num*batch_size*sizeof(float), 0));
-    gpuErrCheck( cudaMemset( cnn_delta_gpu, cnn_hidden_node_num * batch_size*sizeof(float), 0));
-    gpuErrCheck( cudaMemset( mask, params_cnn->pool_out_dim[0]*batch_size*sizeof(int), 0));
+    gpuErrCheck( cudaMemset(mid_data_gpu, 0, nn_in_dim[0] * batch_size*sizeof(float) ));
+    gpuErrCheck( cudaMemset( mid_delta_gpu, 0, nn_in_dim[0] * batch_size*sizeof(float)));
+    gpuErrCheck( cudaMemset( cnn_hidden_result_gpu, 0, cnn_hidden_node_num*batch_size*sizeof(float)));
+    gpuErrCheck( cudaMemset( cnn_delta_gpu, 0, cnn_hidden_node_num * batch_size*sizeof(float)));
+    gpuErrCheck( cudaMemset( mask, 0, params_cnn->pool_out_dim[0]*batch_size*sizeof(int)));
 
     gpuErrCheck( cudaMemcpy( cnn_para_gpu,
 		cnn_cpu,
@@ -682,9 +645,21 @@ void *lbxParallelTrainLock ( void *arg ) {
     //******************************************************************
     // assistant all-one vector
     float *vec_one_gpu; 		// All 1-vector, length = batch_size
+/*
+    float *vec_one_cpu; 		// All 1-vector, length = batch_size
+    vec_one_cpu = (float *)malloc(sizeof(float) * batch_size);
+    for (int i = 0; i < batch_size; i++)
+	vec_one_cpu[i] = 1.0f;
 
+    gpuErrCheck( cudaMemcpy( vec_one_gpu, vec_one_cpu, batch_size * sizeof(float),
+		cudaMemcpyHostToDevice ));
+    printf("SetConst\n");
+    fflush(stdout);
+    gpuErrCheck( cudaPeekAtLastError() );
+    printf("SetConstDone\n");
+    fflush(stdout);
+*/
     gpuErrCheck( cudaMalloc((void**)&vec_one_gpu, batch_size * sizeof(float)) );
-
     lbxSetConstGPU( batch_size, vec_one_gpu, 1.0f);
 
     int size_row_filled_in_buffer = 0;
@@ -764,8 +739,6 @@ void *lbxParallelTrainLock ( void *arg ) {
 	train_data_buffer_gpu = train_data_temp_gpu;
 	train_data_temp_gpu = temp;
 
-	cudaDeviceSynchronize();
-	gpuErrCheck( cudaPeekAtLastError() );
 	//***************************************************************
 	if( !cv_flag ) {
 
@@ -794,8 +767,6 @@ void *lbxParallelTrainLock ( void *arg ) {
 
 	} else {
 
-	    cudaDeviceSynchronize();
-	    gpuErrCheck( cudaPeekAtLastError() );
 	    gpuErrCheck( cudaMemcpy( nn_in_gpu,
 			train_data_buffer_gpu,
 			size_row_filled_in_buffer * nn_in_stride * sizeof(float),
@@ -815,7 +786,7 @@ void *lbxParallelTrainLock ( void *arg ) {
 
 	while ( size_row_filled_in_buffer >= batch_size ) {
 
-	    if( update_count == 0 ) {
+	    if( multicard && update_count == 0 ) {
 
 		// ############################
 		// begin mutex for download model to GPU
@@ -846,7 +817,6 @@ void *lbxParallelTrainLock ( void *arg ) {
 	    }
 
 	    update_count++;
-
 	    // forward pass
 	    cnnNetPropa(cnn_para_gpu, cnn_hidden_result_gpu,
 		    nn_in_gpu + (index_top_of_the_buffer * nn_in_stride), nn_in_stride,
@@ -854,9 +824,6 @@ void *lbxParallelTrainLock ( void *arg ) {
 		    params_cnn, batch_size,
 		    vec_one_gpu, mask);
 
-
-	    cudaDeviceSynchronize();
-	    gpuErrCheck( cudaPeekAtLastError() );
 	    lbxNetPropagation( nn_para_gpu, nn_hidden_result_gpu, 
 		    mid_data_gpu, nn_out_gpu,
 		    nn_layer_num, batch_size, 
@@ -888,7 +855,7 @@ void *lbxParallelTrainLock ( void *arg ) {
 			vec_one_gpu );
 
 		cnnNetBackPropa(cnn_para_gpu, cnn_hidden_result_gpu,
-			cnn_delta_gpu, 
+			cnn_delta_gpu, cnn_para_grad_gpu, 
 			nn_in_gpu + (index_top_of_the_buffer * nn_in_stride), nn_in_stride,
 			mid_delta_gpu, mid_delta_stride,
 			mid_data_gpu, mid_data_stride,
@@ -896,9 +863,8 @@ void *lbxParallelTrainLock ( void *arg ) {
 			learn_rate,
 			vec_one_gpu, mask );
 
-		cudaMemset( cnn_delta_gpu, cnn_hidden_node_num*batch_size*sizeof(float), 0);// Clear
 
-		if( update_count == update_freq ) {
+		if( multicard && update_count == update_freq ) {
 
 		    cublasSaxpy( nn_para_num, 
 			    -1.0f,
@@ -987,6 +953,14 @@ void *lbxParallelTrainLock ( void *arg ) {
     printf( "-------------------------------------\n" );
 
     fflush(stdout);
+
+    if (!multicard)
+    {
+	cudaMemcpy(nn_para_cpu, nn_para_gpu, nn_para_num * sizeof(float), cudaMemcpyDeviceToHost);
+	cudaMemcpy(cnn_cpu, cnn_para_gpu, params_cnn->cnn_para_num * sizeof(float), cudaMemcpyDeviceToHost);
+    }
+
+
 
     // ############################
     pthread_mutex_lock( &xent_mutex );

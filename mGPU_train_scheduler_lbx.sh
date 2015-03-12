@@ -3,7 +3,7 @@
 # Copyright 2014&2015 dpxlbx
 
 # Train neural network
-train_tool="./src/nnetbin/cnn_train_mGPU"
+train_tool="./lbx_train_mGPU"
 dir="."
 
 # Training Data Location
@@ -13,7 +13,7 @@ labels_tr="/home/maohz/kalditu/egs/200k/s5/exp/ali/train.dat"
 labels_cv="/home/maohz/kalditu/egs/200k/s5/exp/ali/cv.dat"
 
 # NN Parameter
-mlp_init="cnn.init"
+mlp_init="nnet.init"
 feature_transform="/home/maohz/kaldi-trunk/egs/200k/s5/exp/final.feature_transform"
 
 # Training Options
@@ -80,7 +80,7 @@ for iter in $(seq -w $max_iters); do
   [ -e $dir/.done_iter$iter ] && echo -n "skipping... " && ls $mlp_next* && continue 
   
   if [ $iter -le 1 ];then
-    minibatch_size=256
+    minibatch_size=1024
     actual_feats_tr="$dir/train.scp.10k"
   elif [ $iter -le 2 ];then
     minibatch_size=256

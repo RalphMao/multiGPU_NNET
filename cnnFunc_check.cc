@@ -31,8 +31,7 @@ void cnnNetPropa( float *cnn_para_gpu, float *cnn_hidden_result_gpu,
     int cnn_hidden_stride = params->cnn_out_dim[0];
     int num_pools = 1+ (num_patches - params->pool_size[0])/params->pool_step[0];
 
-    float *filter_handle, *bias_handle, *train_data_handle, *hidden_handle, *out_handle;
-    int *mask_handle;
+    float * filter_handle, *bias_handle, *train_data_handle, *hidden_handle, *out_handle;
 
     float constant_one_float = 1.0f;
     float constant_zero_float = 0.0f;
@@ -76,19 +75,16 @@ void cnnNetPropa( float *cnn_para_gpu, float *cnn_hidden_result_gpu,
 	    }
 	}
 
-	/*
 	hidden_handle = cnn_hidden_result_gpu + s * num_patches * num_filters_sec; //???
 	out_handle = cnn_out_gpu + s * num_pools * num_filters_sec;
 	max_stride(hidden_handle,out_handle,num_filters_sec,cnn_hidden_stride,cnn_out_stride,params->pool_step[0],params->pool_size[0],batch_size,num_pools, mask);
-*/
+
     }
-    max_stride(cnn_hidden_result_gpu, cnn_out_gpu, num_filters_sec, cnn_hidden_stride, 
-	    cnn_out_stride,params->pool_step[0],params->pool_size[0],batch_size,num_pools * num_sections, mask);
     lbxSigmoidGPU(batch_size*cnn_out_stride,cnn_out_gpu,cnn_out_gpu);
     cublasDestroy(handle);
 }
 void cnnNetBackPropa(float *cnn_para_gpu, float *cnn_hidden_result_gpu,
-	float *cnn_delta_gpu, float *cnn_para_grad_gpu,
+	float *cnn_delta_gpu, 
 	float *train_data, int train_data_stride,
 	float *obj_diff, int obj_diff_stride,
 	float *obj_data, int obj_data_stride,
@@ -113,21 +109,23 @@ void cnnNetBackPropa(float *cnn_para_gpu, float *cnn_hidden_result_gpu,
     int cnn_hidden_stride = params->cnn_out_dim[0];
     int num_pools = 1+ (num_patches - params->pool_size[0])/params->pool_step[0];
 
-    float * filter_grad_handle, *bias_grad_handle, *train_data_handle, *delta_handle, *out_handle;
-    int *mask_handle;
+    float * filter_handle, *bias_handle, *train_data_handle, *delta_handle, *out_handle;
 
     float constant_one_float = 1.0f;
     float constant_zero_float = 0.0f;
     float lr = -learn_rate;
 
-    lbxSetConstGPU(params->cnn_out_dim[0] * batch_size, cnn_delta_gpu, 0.0f);
-    lbxSetConstGPU(params->cnn_para_num, cnn_para_grad_gpu, 0.0f);
-
     lbxDiffSigmoidGPU(obj_diff_stride * batch_size, obj_diff, obj_data, obj_diff);
 
-    back_max_stride(cnn_delta_gpu, obj_diff, num_filters_sec, obj_diff_stride,batch_size,num_pools * num_sections, mask);
+    for (int s=0; s<num_sections;s++)
+    {
+
+	delta_handle = cnn_delta_gpu + s * num_patches * num_filters_sec;
+	out_handle = obj_diff + s * num_pools * num_filters_sec;
+
+	back_max_stride(delta_handle,out_handle,num_filters_sec,obj_diff_stride,batch_size,num_pools, mask);
+    }
     // Check code
-    /*
     float *train_data_cpu_temp = (float *)malloc( params->cnn_out_dim[0] * sizeof(float) );
 
     cudaMemcpy(train_data_cpu_temp, cnn_delta_gpu, params->cnn_out_dim[0]* sizeof(float),cudaMemcpyDeviceToHost);
@@ -139,13 +137,14 @@ void cnnNetBackPropa(float *cnn_para_gpu, float *cnn_hidden_result_gpu,
     }
     fprintf(train_data_file, " ]\n");
     fclose(train_data_file);
-*/
+
+
     for (int s=0; s<num_sections;s++)
     {
-	filter_grad_handle = cnn_para_grad_gpu + s * num_filters_sec * filter_dim;
-	bias_grad_handle = cnn_para_grad_gpu + num_filters * filter_dim + s * num_filters_sec;
+	filter_handle = cnn_para_gpu + s * num_filters_sec * filter_dim;
+	bias_handle = cnn_para_gpu + num_filters * filter_dim + s * num_filters_sec;
 
-	// Calculate filter grad and bias grad 
+	// Update Weight and Bias
 	for (int p=0; p<num_patches;p++)
 	{
 	    train_data_handle = train_data + (s*params->filter_step[0]+p*params->patch_step[0])*num_splice;
@@ -157,7 +156,7 @@ void cnnNetBackPropa(float *cnn_para_gpu, float *cnn_hidden_result_gpu,
 		    train_data_handle, train_data_stride,
 		    delta_handle, cnn_hidden_stride,
 		    &constant_one_float,
-		    filter_grad_handle, filter_dim );
+		    filter_handle, filter_dim );
 
 	    if (stat != CUBLAS_STATUS_SUCCESS) { 
 		printf ("cnnCUBLAS EXECUTE failed\n"); 
@@ -169,16 +168,14 @@ void cnnNetBackPropa(float *cnn_para_gpu, float *cnn_hidden_result_gpu,
 		    delta_handle, cnn_hidden_stride,
 		    vec_one_gpu, 1,
 		    &constant_one_float,
-		    bias_grad_handle, 1);
+		    bias_handle, 1);
 	    if (stat != CUBLAS_STATUS_SUCCESS) { 
 		printf ("cnnCUBLAS EXECUTE failed\n"); 
 		return; 
 	    }
 	}
+
     }
-    // Update
-    cublasSaxpy(handle,params->cnn_para_num, &constant_one_float,
-	    cnn_para_grad_gpu, 1, cnn_para_gpu, 1);
 
     cublasDestroy(handle);
 

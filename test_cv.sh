@@ -13,7 +13,7 @@ labels_tr="/home/maohz/kalditu/egs/200k/s5/exp/ali/train.dat"
 labels_cv="/home/maohz/kalditu/egs/200k/s5/exp/ali/cv.dat"
 
 # NN Parameter
-mlp_init="nnet_dnn_test.init"
+mlp_init="nnet.next"
 feature_transform="/home/maohz/kaldi-trunk/egs/200k/s5/exp/final.feature_transform"
 
 # Training Options
