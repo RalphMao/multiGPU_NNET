@@ -3,7 +3,7 @@
 # Copyright 2014&2015 dpxlbx
 
 # Train neural network
-train_tool="./src/nnetbin/cnn_train_mGPU"
+train_tool="./cnn_train_mGPU"
 dir="."
 
 # Training Data Location
@@ -17,7 +17,7 @@ mlp_init="cnn.init"
 feature_transform="/home/maohz/kaldi-trunk/egs/200k/s5/exp/final.feature_transform"
 
 # Training Options
-learn_rate=0.003
+learn_rate=0.001
 minibatch_size=1024
 randomizer_size=32768
 
@@ -83,7 +83,7 @@ for iter in $(seq -w $max_iters); do
     minibatch_size=256
     actual_feats_tr="$dir/train.scp.10k"
   elif [ $iter -le 2 ];then
-    minibatch_size=256
+    minibatch_size=1024
     actual_feats_tr="$dir/train.scp.1m"
   else
     minibatch_size=1024
@@ -91,9 +91,9 @@ for iter in $(seq -w $max_iters); do
   fi
   # training
   log=$dir/log/iter${iter}.tr.log
-  $train_tool --num-updates=1 --num-threads=1 --cross-validate=false --learn-rate=$learn_rate --bunchsize=$minibatch_size \
+  $train_tool --num-updates=3 --num-threads=4 --cross-validate=false --learn-rate=$learn_rate --bunchsize=$minibatch_size \
               --cachesize=$randomizer_size --feature-transform=$feature_transform \
-              $mlp_best $actual_feats_tr $labels_tr $mlp_next \
+              $mlp_best $feats_tr $labels_tr $mlp_next \
               > $log || exit 1;
 
   tr_accuracy=$(cat $dir/log/iter${iter}.tr.log | grep "FRAME_ACCURACY >>" | tail -n 1 | awk '{printf substr($3,1,length($3)-1)}')

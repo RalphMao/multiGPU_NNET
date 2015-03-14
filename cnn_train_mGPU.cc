@@ -734,13 +734,13 @@ void *lbxParallelTrainLock ( void *arg ) {
 
 	cnnTransform(size_row_filled_in_buffer, params_cnn->cnn_in_dim[0], nn_in_stride,
 		transform_matrix, train_data_buffer_gpu, train_data_temp_gpu);
-
+/*
 	float *temp = train_data_buffer_gpu;
 	train_data_buffer_gpu = train_data_temp_gpu;
 	train_data_temp_gpu = temp;
-
+*/
 	//***************************************************************
-	if( !cv_flag ) {
+if( !cv_flag ) {
 
 	    // ----------------------------------- //
 	    // shuffle the buffer (the data index)
@@ -756,12 +756,19 @@ void *lbxParallelTrainLock ( void *arg ) {
 		tgt_out_index_cpu[i] = label_buffer_cpu[ shuffle_index_cpu[i] ];
 	    }
 
+	    /*
+	    FILE *train_data_file;
+	    train_data_file = fopen("index.dat","w");
+	    for (int i = 0; i < size_row_filled_in_buffer; i++)
+		fprintf(train_data_file, "%d\n", shuffle_index_cpu[i]);
+	    fclose(train_data_file);
+	    */
 	    gpuErrCheck( cudaMemcpy( shuffle_index_gpu,
 			shuffle_index_cpu,
 			size_row_filled_in_buffer * sizeof(int),
 			cudaMemcpyHostToDevice ) );
 
-	    lbxPrefetchDataAccordingToShuffleIndexGPU( size_row_filled_in_buffer, nn_in_dim[0], nn_in_stride, 
+	    lbxPrefetchDataAccordingToShuffleIndexGPU( size_row_filled_in_buffer, params_cnn->cnn_in_dim[0], nn_in_stride, 
 		    shuffle_index_gpu, 
 		    train_data_buffer_gpu, nn_in_gpu );
 
@@ -775,7 +782,7 @@ void *lbxParallelTrainLock ( void *arg ) {
 	    memcpy( tgt_out_index_cpu, 
 		    label_buffer_cpu, 
 		    size_row_filled_in_buffer * sizeof(int) );
-	}
+}
 
 	gpuErrCheck( cudaMemcpy( tgt_out_index_gpu,
 		    tgt_out_index_cpu,
@@ -815,6 +822,7 @@ void *lbxParallelTrainLock ( void *arg ) {
 			    cudaMemcpyDeviceToDevice ) );
 
 	    }
+
 
 	    update_count++;
 	    // forward pass

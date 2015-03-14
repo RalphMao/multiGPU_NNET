@@ -242,5 +242,9 @@ void cnnTransform(int size_row, int size_col, int stride,
 	return; 
     }
 
+    cudaMemcpy(train_data_gpu, train_data_temp_gpu, 
+	    stride * size_row * sizeof(float),
+	    cudaMemcpyDeviceToDevice);
+
     cublasDestroy(handle);
 }
