@@ -1,0 +1,30 @@
+NVCC = nvcc
+CXX = icpc
+
+EXE = cnn_train_mGPU
+
+CUDA_FILE = lbx_cuda_kernels.cu mhz_cuda_kernels.cu
+C_FILE = cnnFunc.cc cnn_train_mGPU.cc lbx_nn.cc cnn_io.cc parse-options.cc gpuErrCheck_INLINE_H_.cc
+
+CUDA_O_FILE = lbx_cuda_kernels.o mhz_cuda_kernels.o
+C_O_FILE = cnnFunc.o cnn_train_mGPU.o lbx_nn.o cnn_io.o parse-options.o gpuErrCheck_INLINE_H_.o \
+
+NVCC_FLAGS = -lcudart -arch=compute_30 -code=compute_30,sm_30 -O2
+#NVCC_FLAGS = -lcudart -arch=compute_30 -code=compute_30,sm_30 -O3
+
+MKLROOT = /opt/intel/mkl
+MKLPATH=$(MKLROOT)/lib/intel64
+MKLINCLUDE=$(MKLROOT)/include
+
+all: $(CUDA_O_FILE) $(C_O_FILE)
+	$(CXX) -rdynamic -Wall -o $(EXE) -L /usr/local/cuda/lib64 -lcuda -lcudart -lcublas  -L$(MKLPATH) -I$(MKLINCLUDE) -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread $(CUDA_O_FILE) $(C_O_FILE)
+
+$(CUDA_O_FILE): $(CUDA_FILE)
+	$(NVCC) -c $(NVCC_FLAGS) $(CUDA_FILE)
+
+$(C_O_FILE): $(C_FILE)
+	$(CXX) -rdynamic -O3 -Wall -c -I /usr/local/cuda/include/ -lcublas -L$(MKLPATH) -I$(MKLINCLUDE) -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread $(C_FILE) 
+	
+
+clean:
+	rm -f *.o $(EXE)
