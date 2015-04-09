@@ -663,6 +663,7 @@ void *lbxParallelTrainLock ( void *arg ) {
     lbxSetConstGPU( batch_size, vec_one_gpu, 1.0f);
 
     int size_row_filled_in_buffer = 0;
+    int size_row_filled_in_buffer_last_time = 0;
     int index_top_of_the_buffer = 0;
 
     long long int utter_count = 0;
@@ -729,11 +730,15 @@ void *lbxParallelTrainLock ( void *arg ) {
 
 	//Feature Transform for CNN
 	//***************************************************************
-	lbxAddRowToMatrixThenRescaleGPU( size_row_filled_in_buffer, params_cnn->cnn_in_dim[0], nn_in_stride, 
-		add_row_data_gpu, mul_row_data_gpu, train_data_buffer_gpu ); 
+	if (size_row_filled_in_buffer != size_row_filled_in_buffer_last_time) {
+	lbxAddRowToMatrixThenRescaleGPU( size_row_filled_in_buffer - size_row_filled_in_buffer_last_time,
+		params_cnn->cnn_in_dim[0], nn_in_stride, 
+		add_row_data_gpu, mul_row_data_gpu, 
+		train_data_buffer_gpu + size_row_filled_in_buffer_last_time * nn_in_stride); 
 
-	cnnTransform(size_row_filled_in_buffer, params_cnn->cnn_in_dim[0], nn_in_stride,
-		transform_matrix, train_data_buffer_gpu, train_data_temp_gpu);
+	cnnTransform(size_row_filled_in_buffer - size_row_filled_in_buffer_last_time, params_cnn->cnn_in_dim[0], nn_in_stride,
+		transform_matrix, train_data_buffer_gpu + size_row_filled_in_buffer_last_time * nn_in_stride, train_data_temp_gpu);
+	}
 /*
 	float *temp = train_data_buffer_gpu;
 	train_data_buffer_gpu = train_data_temp_gpu;
@@ -917,6 +922,7 @@ if( !cv_flag ) {
 
 	}
 
+	size_row_filled_in_buffer_last_time = size_row_filled_in_buffer;
 
 	if( size_row_filled_in_buffer > 0 ) {
 
