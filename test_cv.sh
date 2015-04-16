@@ -7,14 +7,14 @@ train_tool="./cnn_train_mGPU"
 dir="."
 
 # Training Data Location
-feats_tr="/home/maohz/kalditu/egs/200k/s5/data/train/feats_total.scp"
-feats_cv="/home/maohz/kalditu/egs/200k/s5/data/cv/feats_total.scp"
-labels_tr="/home/maohz/kalditu/egs/200k/s5/exp/ali/train.dat"
-labels_cv="/home/maohz/kalditu/egs/200k/s5/exp/ali/cv.dat"
+feats_tr="/home/maohz12/input_990_output_9872/data_new/train.scp"
+feats_cv="/home/maohz12/input_990_output_9872/data_new/cv.scp"
+labels_tr="/home/maohz12/input_990_output_9872/data_new/train.huizi.pdf"
+labels_cv="/home/maohz12/input_990_output_9872/data_new/cv.huizi.pdf"
 
 # NN Parameter
-mlp_init="nnet.next"
-feature_transform="/home/maohz/kaldi-trunk/egs/200k/s5/exp/final.feature_transform"
+mlp_init="cnn_990.nnet"
+feature_transform="/home/maohz12/input_990_output_9872/final_dnn.feature_transform"
 
 # Training Options
 learn_rate=0.00

@@ -7,14 +7,14 @@ train_tool="./cnn_train_mGPU"
 dir="."
 
 # Training Data Location
-feats_tr="/home/dpxlbx/kalditu/egs/200k/s5/data/train/feats_total.scp"
-feats_cv="/home/dpxlbx/kalditu/egs/200k/s5/data/cv/feats_total.scp"
-labels_tr="/home/dpxlbx/kalditu/egs/200k/s5/exp/ali/train.dat"
-labels_cv="/home/dpxlbx/kalditu/egs/200k/s5/exp/ali/cv.dat"
+feats_tr="/home/maohz12/input_990_output_9872/data_new/train.scp"
+feats_cv="/home/maohz12/input_990_output_9872/data_new/cv.scp"
+labels_tr="/home/maohz12/input_990_output_9872/data_new/train.huizi.pdf"
+labels_cv="/home/maohz12/input_990_output_9872/data_new/cv.huizi.pdf"
 
 # NN Parameter
-mlp_init="cnn.init"
-feature_transform="/home/dpxlbx/kalditu/lbx_nn_mGPU/final.feature_transform"
+mlp_init="cnn_990.nnet"
+feature_transform="/home/maohz12/input_990_output_9872/final_dnn.feature_transform"
 
 # Training Options
 learn_rate=0.001
@@ -22,7 +22,7 @@ minibatch_size=1024
 randomizer_size=32768
 
 # Learn Rate Scheduling
-max_iters=20
+max_iters=3
 # absolute decrease value for halving learn rate
 start_halving_impr=0.5
 # absolute decrease value for halving learn rate
@@ -91,7 +91,7 @@ for iter in $(seq -w $max_iters); do
   fi
   # training
   log=$dir/log/iter${iter}.tr.log
-  $train_tool --num-updates=2 --num-threads=2 --cross-validate=false --learn-rate=$learn_rate --bunchsize=$minibatch_size \
+  $train_tool --num-updates=3 --num-threads=4 --cross-validate=false --learn-rate=$learn_rate --bunchsize=$minibatch_size \
               --cachesize=$randomizer_size --feature-transform=$feature_transform \
               $mlp_best $actual_feats_tr $labels_tr $mlp_next \
               > $log || exit 1;
@@ -125,18 +125,6 @@ for iter in $(seq -w $max_iters); do
 
   # create .done file as a mark that iteration is over
   touch $dir/.done_iter$iter
-
-  # stopping criterion
-  if [[ "1" == "$halving" && "1" == "$(awk "BEGIN{print(($accuracy-$accuracy_prev) < $end_halving_impr)}")" ]]; then
-    if [[ "$min_iters" != "" ]]; then
-      if [ $min_iters -gt $iter ]; then
-        echo we were supposed to finish, but we continue, min_iters : $min_iters
-        continue
-      fi
-    fi
-    echo finished, too small rel. improvement $(awk "BEGIN{print(($accuracy-$accuracy_prev))}")
-    break
-  fi
 
   # start annealing when improvement is low
   if [ "1" == "$(awk "BEGIN{print(($accuracy-$accuracy_prev) < $start_halving_impr)}")" ]; then

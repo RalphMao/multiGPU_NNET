@@ -1,0 +1,5 @@
+*.nnet
+*.dat
+*.init
+nnet/*
+log*

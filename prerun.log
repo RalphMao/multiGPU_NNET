@@ -1,0 +1,142 @@
+-------------- LBX LOG --------------
+           Cross Validation
+-------------------------------------
+Feats: 990_in.dat
+Output File: 9872_out.dat
+Feature_Transform: /home/maohz12/input_990_output_9872/final_dnn.feature_transform
+Reading: <Nnet>
+-------------------------------------
+Learn Rate = 0.000000
+Batch Size = 1024
+Buffer Size = 32768
+Updates Freq = 3
+-------------------------------------
+Load NN Parameter FILE: cnn_990.nnet
+-------------------------------------
+      Start Reading Kaldi Nnet
+-------------------------------------
+Layer  1: <AffineTransform> + <Sigmoid>: Input Dim =  2048, Output Dim =  2048
+Layer  2: <AffineTransform> + <Sigmoid>: Input Dim =  2048, Output Dim =  2048
+Layer  3: <AffineTransform> + <Sigmoid>: Input Dim =  2048, Output Dim =  2048
+Layer  4: <AffineTransform> + <Softmax>: Input Dim =  2048, Output Dim =  9872
+-------------------------------------
+     Load Kaldi Nnet Sucessfully
+-------------------------------------
+CNN files read
+nn_in_stride = 990, nn_out_stride = 9872
+-------------------------------------
+       Parellel Training Start!
+-------------------------------------
+-------------------------------------
+             GPU 0 Start!
+-------------------------------------
+2048 2048 2048
+ total size:17232 readin_size:32768
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+GPU [0]: After 32768 utterances: time elapsed = 0.050 min; processed  0.00 frames per second
+total size:0 readin_size:17232
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+checkpoint2
+Batch size:1024
+GPU [0]: After 50000 utterances: time elapsed = 0.067 min; processed  0.00 frames per second
+checkpoint2
+Batch size:848
+-------------------------------------
+GPU [0] Finish Training! After 50000 utterances: time elapsed = 0.067 min; processed  0.00 frames per second
+-------------------------------------
+checkpoint4
+-------------------------------------
+             Finish!
+-------------------------------------
